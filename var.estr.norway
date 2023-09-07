@@ -1,0 +1,707 @@
+## VAR en forma reducida para series de noruega: 
+## Utilizando el paper de de Blanchard and Perotti (1999)
+set.seed(5056)
+library(readxl)
+library(tseries)
+library(forecast)
+library(readr)
+library(fUnitRoots)
+library("gdata")
+library("rugarch")
+library("vars")
+library("dynlm")
+
+#Cargar base de datos
+
+setwd('d:/Desktop/CICLO 7/Macroeconometria/R/Trabajo 2')
+data1 <- read_excel("Data_Laboratorio2_preguntaARCH.xlsx", 
+                    range = "A2:I632", 
+                    col_types = c("numeric", "numeric", "skip", "skip", "numeric","skip", "skip", "skip", "skip"))
+
+# --------- 1. Evaluar estacionariedad y calcular mejor modelo ARMA(p,q) ----------------------
+
+ratets <- ts(data1$`5-year`,
+           start = c(1960, 1), 
+           end = c(2012, 6), 
+           frequency = 12)
+
+#An?lisis gr?fico: Parece ser no estacionario, pues no tiene una media constante y sus desvios son largos y no regresan r?pidamente a su media
+plot.ts(ratets,ylab = "5-years rate",cex.main=1.5,main="Tasa a 5 a?os del treasury",lwd=2,font.main=11,col='blue')
+#Test ra?z unitaria Dickey-Fuller Aumentado, la serie parece tener constante (pues inicia en valor=5), mas no tendencia determin?stica
+adfTest(ratets, lags=1, type = c("c"))
+#An?lisis de robustez: realizar el test de Dickey-Fuller con constante y TD
+adfTest(ratets, lags=1, type = c("ct")) #Mismo resultado
+#pvalue>5% --> No se rechaza la H0, por lo que hay ra?z unitaria
+#Quitamos ra?z unitaria y vemos estacionariedad
+drate <- diff(ratets)
+plot.ts(drate,ylab = "diff 5-years rate",cex.main=1.5,main="Primeras diferencias de la tasa a 5 a?os del treasury",lwd=1.5,font.main=11,col='blue')
+adfTest(drate, lags=1, type = c("nc")) #Ya no hay ra?z unitaria pues se rechaza H0
+
+#Para hallar el modelo que mejor se ajusta a los datos seguiremos la metodolog?a Box-Jenkins 
+#Primero vemos la FAP y la FAS de la serie para saber si gr?ficamente ya podemos ir sabiendo qu? modelo trata
+par(mfrow=c(1,2))
+drate_acf=acf(drate,las=1,lag.max=20,tck=.02,xlab="lags",
+               ylab="FAS",main="") 
+drate_pacf=pacf(drate,las=1,lag.max=20,tck=.02,xlab="lags",
+                 ylab="FAP",main="")
+title("FAS y FAP de la serie transformada", line = -1, outer = TRUE, font.main=11)
+#Debido a que ninguna de estas correlaciones tiende al infinito, serie casi seguro no es ni AR ni MA, sino un ARMA
+
+# Definimos los modelos a utilizar utilizando los pmax=qmax=4.  
+regarma11 <- arima(drate, order=c(1,0,1), include.mean = FALSE)
+regarma12 <- arima(drate, order=c(1,0,2), include.mean = FALSE)
+regarma13 <- arima(drate, order=c(1,0,3), include.mean = FALSE)
+regarma14 <- arima(drate, order=c(1,0,4), include.mean = FALSE)
+regarma21 <- arima(drate, order=c(2,0,1), include.mean = FALSE)
+regarma22 <- arima(drate, order=c(2,0,2), include.mean = FALSE)
+regarma23 <- arima(drate, order=c(2,0,3), include.mean = FALSE)
+regarma24 <- arima(drate, order=c(2,0,4), include.mean = FALSE)
+regarma31 <- arima(drate, order=c(3,0,1), include.mean = FALSE)
+regarma32 <- arima(drate, order=c(3,0,2), include.mean = FALSE)
+regarma33 <- arima(drate, order=c(3,0,3), include.mean = FALSE)
+regarma34 <- arima(drate, order=c(3,0,4), include.mean = FALSE)
+regarma41 <- arima(drate, order=c(4,0,1), include.mean = FALSE)
+regarma42 <- arima(drate, order=c(4,0,2), include.mean = FALSE)
+regarma43 <- arima(drate, order=c(4,0,3), include.mean = FALSE)
+regarma44 <- arima(drate, order=c(4,0,4), include.mean = FALSE)
+
+# a.-  Calculamos los residuos de las estimaciones. 
+
+residuosarma11<- regarma11$residuals
+residuosarma12<- regarma12$residuals
+residuosarma13<- regarma13$residuals
+residuosarma14<- regarma14$residuals
+residuosarma21<- regarma21$residuals
+residuosarma22<- regarma22$residuals
+residuosarma23<- regarma23$residuals
+residuosarma24<- regarma24$residuals
+residuosarma31<- regarma31$residuals
+residuosarma32<- regarma32$residuals
+residuosarma33<- regarma33$residuals
+residuosarma34<- regarma34$residuals
+residuosarma41<- regarma41$residuals
+residuosarma42<- regarma42$residuals
+residuosarma43<- regarma43$residuals
+residuosarma44<- regarma44$residuals
+
+#  - Calculamos los test de Box-Ljung y Box-Pierce para ver si los residuos se encuentran correlacionados o no
+# b.- Utilizando los test Lunj-Box y Box-Pierce 
+
+# ARMA(1,1)
+Box.test(residuosarma11,lag=8,type="Ljung-Box")
+Box.test(residuosarma11,lag=8,type="Box-Pierce")
+#ARMA(1,2)
+Box.test(residuosarma12,lag=8,type="Ljung-Box")
+Box.test(residuosarma12,lag=8,type="Box-Pierce")
+#ARMA(1,3)
+Box.test(residuosarma13,lag=8,type="Ljung-Box")
+Box.test(residuosarma13,lag=8,type="Box-Pierce")
+#ARMA(1,4)
+Box.test(residuosarma14,lag=8,type="Ljung-Box")
+Box.test(residuosarma14,lag=8,type="Box-Pierce")
+#ARMA(2,1)
+Box.test(residuosarma21,lag=8,type="Ljung-Box")
+Box.test(residuosarma21,lag=8,type="Box-Pierce")
+#ARMA(2,2)
+Box.test(residuosarma22,lag=8,type="Ljung-Box")
+Box.test(residuosarma22,lag=8,type="Box-Pierce")
+#ARMA(2,3)
+Box.test(residuosarma23,lag=8,type="Ljung-Box")
+Box.test(residuosarma23,lag=8,type="Box-Pierce")
+#ARMA(2,4) -si
+Box.test(residuosarma24,lag=8,type="Ljung-Box")
+Box.test(residuosarma24,lag=8,type="Box-Pierce")
+#ARMA(3,1)
+Box.test(residuosarma31,lag=8,type="Ljung-Box")
+Box.test(residuosarma31,lag=8,type="Box-Pierce")
+#ARMA(3,2)
+Box.test(residuosarma32,lag=8,type="Ljung-Box")
+Box.test(residuosarma32,lag=8,type="Box-Pierce")
+#ARMA(3,3)-si
+Box.test(residuosarma33,lag=8,type="Ljung-Box")
+Box.test(residuosarma33,lag=8,type="Box-Pierce")
+#ARMA(3,4)-si
+Box.test(residuosarma34,lag=8,type="Ljung-Box")
+Box.test(residuosarma34,lag=8,type="Box-Pierce")
+#ARMA(4,1)
+Box.test(residuosarma41,lag=8,type="Ljung-Box")
+Box.test(residuosarma41,lag=8,type="Box-Pierce")
+#ARMA(4,2)
+Box.test(residuosarma42,lag=8,type="Ljung-Box")
+Box.test(residuosarma42,lag=8,type="Box-Pierce")
+#ARMA(4,3)
+Box.test(residuosarma43,lag=8,type="Ljung-Box")
+Box.test(residuosarma43,lag=8,type="Box-Pierce")
+#ARMA(4,4)
+Box.test(residuosarma44,lag=8,type="Ljung-Box")
+Box.test(residuosarma44,lag=8,type="Box-Pierce")
+
+
+#Vemos que solo para los modelos ARMA(1,4) ARMA(2,4),ARMA(3,3),ARMA(3,4),ARMA(4,1),ARMA(4,2),ARMA(4,3) y ARMA(4,4) los residuos no se encuentran autocorrelacionado
+#Calculamos los criterios de informaci?n para esos modelos (AIC, BIC, AICc)
+
+n <- length(drate)
+#ARMA(1,4)
+AIC(regarma14)/n - log(2*pi) # AIC
+BIC(regarma14)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(regarma14)^2)/n) + (n+5)/(n-5-4)) 
+#ARMA(2,4)
+AIC(regarma24)/n - log(2*pi) # AIC
+BIC(regarma24)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(regarma24)^2)/n) + (n+6)/(n-6-4)) 
+#ARMA(3,3)
+AIC(regarma33)/n - log(2*pi) # AIC
+BIC(regarma33)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(regarma33)^2)/n) + (n+6)/(n-6-3)) 
+#ARMA(3,4)
+AIC(regarma34)/n - log(2*pi) # AIC
+BIC(regarma34)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(regarma34)^2)/n) + (n+7)/(n-7-4)) 
+#ARMA(4,1)
+AIC(regarma41)/n - log(2*pi) # AIC
+BIC(regarma41)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(regarma41)^2)/n) + (n+5)/(n-5-1)) 
+#ARMA(4,2)
+AIC(regarma42)/n - log(2*pi) # AIC
+BIC(regarma42)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(regarma42)^2)/n) + (n+6)/(n-6-2)) 
+#ARMA(4,3)
+AIC(regarma43)/n - log(2*pi) # AIC
+BIC(regarma43)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(regarma43)^2)/n) + (n+7)/(n-7-3)) 
+#ARMA(4,4)
+AIC(regarma44)/n - log(2*pi) # AIC
+BIC(regarma44)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(regarma44)^2)/n) + (n+8)/(n-8-4)) 
+
+
+#Seg?n el criterio de AIC y AICc el modelo m?s veros?mil es el ARMA(4,3), mientras
+#seg?n el criterio de BIC el mejor modelo es el ARMA(4,2)
+#Debido a que nuestra muestra es relativamente grande, elegimos al criterio
+#de BIC pues es el m?s robusto para tama?os grandes y nos quedamos con el ARMA(4,2)
+
+# --------- 2. Evaluaci?n gr?fica de existencia de estructuras ARCH ----------------------
+
+res<-residuosarma42
+res2<-res^2
+graphics.off()
+par(mfrow=c(2,1))
+plot.ts(res,ylab = "Valor",cex.main=1.5,main="Residuos lineales serie estacionarizada",lwd=1.2,font.main=11,col='blue')
+plot.ts(res2,ylab = "Valor",cex.main=1.5,main="Residuos^2 serie estacionarizada",lwd=1.2,font.main=11,col='blue')
+
+
+# --------- 3. Evaluaci?n estad?stica de existencia de estructuras ARCH ----------------------
+
+#Primero hacemos un an?lisis simple: Hacemos un s?mil de la prueba del multiplicador de Lagrange y
+#estimamos los coeficientes de un modelo AR(q) para los errores al cuadrado, viendo su
+#su significancia conjunta. Escogeremos p=4:
+regLM<-arima(res2, order=c(4,0,0))
+regLM #Vemos que todos los coeficientes son significativos al 95%, por ende hay estructura ARCH
+
+#No obstante, puede que hayamos especificado mal el modelo y estemos cometiendo errores
+#de tipo 1, por eso usamos el comando RUGARCH para una estimaci?n m?s robusta y conjunta
+#del multiplicador de Lagrange con la estimaci?n del modelo
+
+#Sabemos que tenemos modelo ARMA(4,2) para la serie
+spec.arma42 = arfimaspec(mean.model=list(armaOrder=c(4,2),include.mean=FALSE)) #Especificamos ARMA(4,2)
+fit.arma42 = arfimafit(spec=spec.arma42,data=drate) #Valores ajustados (especificaci?n del modelo, data a trabajar(ya estacionaria))
+fit.arma42
+#Vemos que el coeficiente para el rezago 3 no es significativo en la estimaci?n, por lo que
+#procedemos a eliminarlo antes de realizar las pruebas estad?sticas
+spec.arma42 = arfimaspec(mean.model=list(armaOrder=c(4,2),include.mean=FALSE),fixed.pars=list(ar3=0)) 
+fit.arma42 = arfimafit(spec=spec.arma42,data=drate)
+fit.arma42
+#Para la prueba de Ljung-Box para los residuos al cuadrado se rechaza la H0, lo que 
+#indica que no se puede afirmar que no haya correlaci?n entre los residuos
+#Para la prueba del multiplicador de Lagrange tmb. se rechaza la H0, lo que indica que
+#los residuos al cuadrado se encuentran afectados por sus rezagos
+#ESTOS DOS TEST COINCIDEN EN DECIRNOS QUE, ESPECIFICANDO UN MODELO ARMA(4,2) CON EL REZAGO
+#AR(3)=0, LOS RESIDUOS DE ESE MODELO SIGUEN UNA ESTRUCTURA ARCH. ES DECIR, EL AN?LISIS
+#GR?FICO DEL APARTADO (2) SE COMPLEMENTA CON LA EVIDENCIA ESTAD?STICA QUE NOS DAN ESTOS
+#DOS TEST
+
+# --------- 4. Prueba de ARMA para los residuos cuadrados ----------------------
+#usamos los residuos del ARMA(4,2) con coeficiente de AR(3)=0 
+res.arma42 = fit.arma42@fit$residuals
+resarma2 <-res.arma42^2
+
+#ESTIMAMOS MODELOS ARMA(pmax=4,qmax=4), donde los modelos AR() har?n menci?n de estructuras ARCH()
+#mientras los ARMA(,) se referir?n a las estructuras GARCH(,)
+
+arma10 <-arima(resarma2, order=c(1,0,0), include.mean = TRUE)
+arma11 <-arima(resarma2, order=c(1,0,1), include.mean = TRUE)
+arma12 <-arima(resarma2, order=c(1,0,2), include.mean = TRUE)
+arma13 <-arima(resarma2, order=c(1,0,3), include.mean = TRUE)
+arma14 <-arima(resarma2, order=c(1,0,4), include.mean = TRUE)
+arma20 <-arima(resarma2, order=c(2,0,0), include.mean = TRUE)
+arma21 <-arima(resarma2, order=c(2,0,1), include.mean = TRUE)
+arma22 <-arima(resarma2, order=c(2,0,2), include.mean = TRUE)
+arma23 <-arima(resarma2, order=c(2,0,3), include.mean = TRUE)
+arma24 <-arima(resarma2, order=c(2,0,4), include.mean = TRUE)
+arma30 <-arima(resarma2, order=c(3,0,0), include.mean = TRUE)
+arma31 <-arima(resarma2, order=c(3,0,1), include.mean = TRUE)
+arma32 <-arima(resarma2, order=c(3,0,2), include.mean = TRUE)
+arma33 <-arima(resarma2, order=c(3,0,3), include.mean = TRUE)
+arma34 <-arima(resarma2, order=c(3,0,4), include.mean = TRUE)
+arma40 <-arima(resarma2, order=c(4,0,0), include.mean = TRUE)
+arma41 <-arima(resarma2, order=c(4,0,1), include.mean = TRUE)
+arma42 <-arima(resarma2, order=c(4,0,2), include.mean = TRUE)
+arma43 <-arima(resarma2, order=c(4,0,3), include.mean = TRUE)
+arma44 <-arima(resarma2, order=c(4,0,4), include.mean = TRUE)
+
+# --------- 5. Selecci?n del mejor modelo para los residuos cuadrados ----------------
+#Debido a que pudimos especificar la estructura ARCH-GARCH, podemos escoger cu?l es el
+#modelo que mejor se ajusta a los datos siguiendo la metodolog?a Box-Jenkins
+
+#Ver estacionariedad 
+graphics.off()
+plot.ts(resarma2,ylab = "Valor",cex.main=1.5,main="Residuos^2",lwd=1.2,font.main=11,col='red')
+adfTest(resarma2, lags=1, type = c("ct")) #Gr?ficamente es estacionario y test de ra?z unitaria reafirma lo dicho
+
+#Ver correlaci?n de los residuos seg?n el modelo especificado a partir de los test de Box-Pierce y Ljung-Box
+
+# a.-  Calculamos los residuos de las estimaciones. 
+
+residuosarma10<- arma10$residuals
+residuosarma11<- arma11$residuals
+residuosarma12<- arma12$residuals
+residuosarma13<- arma13$residuals
+residuosarma14<- arma14$residuals
+residuosarma20<- arma20$residuals
+residuosarma21<- arma21$residuals
+residuosarma22<- arma22$residuals
+residuosarma23<- arma23$residuals
+residuosarma24<- arma24$residuals
+residuosarma30<- arma30$residuals
+residuosarma31<- arma31$residuals
+residuosarma32<- arma32$residuals
+residuosarma33<- arma33$residuals
+residuosarma34<- arma34$residuals
+residuosarma40<- arma40$residuals
+residuosarma41<- arma41$residuals
+residuosarma42<- arma42$residuals
+residuosarma43<- arma43$residuals
+residuosarma44<- arma44$residuals
+
+# b. - Calculamos los test de Box-Ljung y Box-Pierce para ver si los residuos se encuentran correlacionados o no
+
+#ARMA(1,0)-NO
+Box.test(residuosarma10,lag=8,type="Ljung-Box")
+Box.test(residuosarma10,lag=8,type="Box-Pierce")
+# ARMA(1,1)-NO
+Box.test(residuosarma11,lag=8,type="Ljung-Box")
+Box.test(residuosarma11,lag=8,type="Box-Pierce")
+#ARMA(1,2)-SI
+Box.test(residuosarma12,lag=8,type="Ljung-Box")
+Box.test(residuosarma12,lag=8,type="Box-Pierce")
+#ARMA(1,3)-SI
+Box.test(residuosarma13,lag=8,type="Ljung-Box")
+Box.test(residuosarma13,lag=8,type="Box-Pierce")
+#ARMA(1,4)-NO
+Box.test(residuosarma14,lag=8,type="Ljung-Box")
+Box.test(residuosarma14,lag=8,type="Box-Pierce")
+#ARMA(2,0)-NO
+Box.test(residuosarma20,lag=8,type="Ljung-Box")
+Box.test(residuosarma20,lag=8,type="Box-Pierce")
+#ARMA(2,1)-SI
+Box.test(residuosarma21,lag=8,type="Ljung-Box")
+Box.test(residuosarma21,lag=8,type="Box-Pierce")
+#ARMA(2,2)-SI
+Box.test(residuosarma22,lag=8,type="Ljung-Box")
+Box.test(residuosarma22,lag=8,type="Box-Pierce")
+#ARMA(2,3)-SI
+Box.test(residuosarma23,lag=8,type="Ljung-Box")
+Box.test(residuosarma23,lag=8,type="Box-Pierce")
+#ARMA(2,4)-SI
+Box.test(residuosarma24,lag=8,type="Ljung-Box")
+Box.test(residuosarma24,lag=8,type="Box-Pierce")
+#ARMA(3,0)-NO
+Box.test(residuosarma30,lag=8,type="Ljung-Box")
+Box.test(residuosarma30,lag=8,type="Box-Pierce")
+#ARMA(3,1)-SI
+Box.test(residuosarma31,lag=8,type="Ljung-Box")
+Box.test(residuosarma31,lag=8,type="Box-Pierce")
+#ARMA(3,2)-SI
+Box.test(residuosarma32,lag=8,type="Ljung-Box")
+Box.test(residuosarma32,lag=8,type="Box-Pierce")
+#ARMA(3,3)-SI
+Box.test(residuosarma33,lag=8,type="Ljung-Box")
+Box.test(residuosarma33,lag=8,type="Box-Pierce")
+#ARMA(3,4)-SI
+Box.test(residuosarma34,lag=8,type="Ljung-Box")
+Box.test(residuosarma34,lag=8,type="Box-Pierce")
+#ARMA(4,0)-SI
+Box.test(residuosarma40,lag=8,type="Ljung-Box")
+Box.test(residuosarma40,lag=8,type="Box-Pierce")
+#ARMA(4,1)-SI
+Box.test(residuosarma41,lag=8,type="Ljung-Box")
+Box.test(residuosarma41,lag=8,type="Box-Pierce")
+#ARMA(4,2)-SI
+Box.test(residuosarma42,lag=8,type="Ljung-Box")
+Box.test(residuosarma42,lag=8,type="Box-Pierce")
+#ARMA(4,3)-SI
+Box.test(residuosarma43,lag=8,type="Ljung-Box")
+Box.test(residuosarma43,lag=8,type="Box-Pierce")
+#ARMA(4,4)-SI
+Box.test(residuosarma44,lag=8,type="Ljung-Box")
+Box.test(residuosarma44,lag=8,type="Box-Pierce")
+
+#Nos quedamos con ARMA(1,2),ARMA(1,3),ARMA(2,1),ARMA(2,2),ARMA(2,3),ARMA(2,4),ARMA(3,1)
+#ARMA(3,2),ARMA(3,3),ARMA(3,4),ARMA(4,1),ARMA(4,2),ARMA(4,3),ARMA(4,4)
+
+#Calculamos los criterios de informaci?n para esos modelos (AIC, BIC, AICc)
+
+#ARMA(1,2)
+AIC(arma12)/n - log(2*pi) # AIC
+BIC(arma12)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(arma12)^2)/n) + (n+3)/(n-3-2)) 
+#ARMA(1,3)
+AIC(arma13)/n - log(2*pi) # AIC
+BIC(arma13)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(arma13)^2)/n) + (n+4)/(n-4-3))
+#ARMA(2,1) --MENOR BIC
+AIC(arma21)/n - log(2*pi) # AIC
+BIC(arma21)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(arma21)^2)/n) + (n+3)/(n-3-1)) 
+#ARMA(2,2)
+AIC(arma22)/n - log(2*pi) # AIC
+BIC(arma22)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(arma22)^2)/n) + (n+4)/(n-4-2))
+#ARMA(2,3)
+AIC(arma23)/n - log(2*pi) # AIC
+BIC(arma23)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(arma23)^2)/n) + (n+5)/(n-5-3))
+#ARMA(2,4)
+AIC(arma24)/n - log(2*pi) # AIC
+BIC(arma24)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(arma24)^2)/n) + (n+6)/(n-6-4)) 
+#ARMA(3,1)
+AIC(arma31)/n - log(2*pi) # AIC
+BIC(arma31)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(arma31)^2)/n) + (n+4)/(n-4-1)) 
+#ARMA(3,2)
+AIC(arma32)/n - log(2*pi) # AIC
+BIC(arma32)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(arma32)^2)/n) + (n+5)/(n-5-2))
+#ARMA(3,3)
+AIC(arma33)/n - log(2*pi) # AIC
+BIC(arma33)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(arma33)^2)/n) + (n+6)/(n-6-3))
+#ARMA(3,4)
+AIC(arma34)/n - log(2*pi) # AIC
+BIC(arma34)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(arma34)^2)/n) + (n+7)/(n-7-4)) 
+#ARMA(4,1)
+AIC(arma41)/n - log(2*pi) # AIC
+BIC(arma41)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(arma41)^2)/n) + (n+5)/(n-5-1)) 
+#ARMA(4,2)
+AIC(arma42)/n - log(2*pi) # AIC
+BIC(arma42)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(arma42)^2)/n) + (n+6)/(n-6-2))
+#ARMA(4,3)
+AIC(arma43)/n - log(2*pi) # AIC
+BIC(arma43)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(arma43)^2)/n) + (n+7)/(n-7-3))
+#ARMA(4,4)
+AIC(arma44)/n - log(2*pi) # AIC
+BIC(arma44)/n - log(2*pi) # BIC
+(AICc = log(sum(resid(arma44)^2)/n) + (n+8)/(n-8-4)) 
+#se escoge el Modelo con menor BIC: ARMA(2,1), por lo que nuestros errores siguen una
+#estructura GARCH(1,2)
+
+
+
+#  ================= Pregunta 2 ===================
+#Cargamos base de datos (Bases modificadas)
+#Poblaci?n
+population <- read_excel("population_norway.xlsx")
+View(population)
+#GDP-Gasto de gobierno-Deflactor
+gdp <- read_excel("gdp_norway.xlsx")
+View(gdp)
+#Taxes
+taxes <-read_excel("taxes_norway.xlsx")
+View(taxes)
+#Creaci?n de variables a usar:
+#GDP real per capita (deflactor es del 2019)
+Yreal_percapita <- ((gdp$`B1_GE: Gross domestic product - expenditure approach...2`*1000000)/(1000*population$`POPNC: Total population`))*(100/gdp$`B1_GE: Gross domestic product - expenditure approach...20`)
+#Gasto Gobierno real per capita (deflactor es del 2019)
+Greal_percapita <- ((gdp$`P3S13: General government final consumption expenditure...5`*1000000)/(1000*population$`POPNC: Total population`))*(100/gdp$`B1_GE: Gross domestic product - expenditure approach...20`)
+#Net taxes real per capita (deflactor es del 2019)
+Treal_percapita <- (((taxes$`D21X31REC: Taxes less subsidies on products`
+                      +taxes$`D5REC: Current taxes on income, wealth, etc.`-taxes$`D61REC: Net social contributions`-taxes$`D7REC: Other current transfers`)*1000000)/(1000*population$`POPNC: Total population`))*(100/gdp$`B1_GE: Gross domestic product - expenditure approach...20`)
+#Series de tiempo
+Y <- ts(Yreal_percapita, 
+                   start = c(1999, 1), 
+                   end = c(2021, 4), 
+                   frequency = 4) 
+G <- ts(Greal_percapita, 
+        start = c(1999, 1), 
+        end = c(2021, 4), 
+        frequency = 4) 
+T <- ts(Treal_percapita, 
+        start = c(1999, 1), 
+        end = c(2021, 4), 
+        frequency = 4) 
+Y <- log(Y)
+G <- log(G)
+T <- log(T)
+
+# --------- 1. Gr?fica de las series y discusi?n sobre la estacionariedad y estacionalidad ----------------------
+
+graphics.off()
+par(mfrow=c(3,1))
+plot.ts(Y,ylab = "log",cex.main=1.5,main="PBI real per capita",lwd=2,font.main=11,col='blue')
+plot.ts(G,ylab = "log",cex.main=1.5,main="Gasto gob. real per capita",lwd=2,font.main=11,col='gray')
+plot.ts(T,ylab = "log",cex.main=1.5,main="Taxes real per capita",lwd=2,font.main=11,col='black')
+
+#Test de DFA para las series
+#Para Y y G especifcamos constante y tendencia
+adfTest(Y, lags=1, type = c("ct")) #No se rechaza H0, hay tendencia estoc?stica
+adfTest(G, lags=1, type = c("ct")) #No se rechaza H0, hay tendencia estoc?stica
+#Para T especifcamos solo con constante, pero por robustez tambi?n realizamos el test con tendencia
+adfTest(T, lags=1, type = c("c")) #No se rechaza H0, hay tendencia estoc?stica
+adfTest(T, lags=1, type = c("ct")) #Mismo resultado
+#Quitamos ra?z unitaria mediante primeras diferencias:
+dY = diff(Y)
+dG = diff(G)
+dT = diff(T)
+#Comprobamos si ahora series ya no cuentan con tendencia estoc?stica.
+adfTest(dY, lags=1, type = c("ct")) 
+adfTest(dG, lags=1, type = c("ct")) 
+adfTest(dT, lags=1, type = c("c")) 
+
+#Realizamos test de estacionalidad para diff(T):
+library("seastests")
+combined_test(dT,freq=4) 
+combined_test(dG,freq=4) 
+combined_test(dY,freq=4) 
+isSeasonal(dT,test="combined",freq=NA)
+isSeasonal(dY,test="combined",freq=NA)
+isSeasonal(dG,test="combined",freq=NA)
+
+# --------- 2. Selecci?n del mejor modelo VAR y estimaci?n reducida ----------------------
+
+#En base al grado de exogeneidad (del m?s ex?geno al menos), ordenamos: 1) G, 2)T y 3) Y
+
+#Consideramos esto en la construcci?n del vector autorregresivo:
+VAR_BP <- window(ts.union(dG, dT,dY), start = c(1999, 1), end = c(2021, 4),frequency=4)
+VARselect(VAR_BP,lag.max=20,type="const")
+#Escogemos el modelo con menor SC-> 1 rezago
+
+#Estimamos el Var reducido con un solo rezago, mediante una estimaci?n manual por MCO:
+VAR_BP_EQ1 <- dynlm(dY ~ L(dY, 1) + L(dG, 1) + L(dT,1), 
+                 start = c(1999, 1), 
+                 end = c(2021, 4))
+VAR_BP_EQ2 <- dynlm(dG ~ L(dY, 1) + L(dG, 1) + L(dT,1), 
+                 start = c(1999, 1), 
+                 end = c(2021, 4))
+VAR_BP_EQ3 <- dynlm(dT ~ L(dY, 1) + L(dG, 1) + L(dT,1), 
+                 start = c(1999, 1), 
+                 end = c(2021, 4))
+#Ponemos nombres a los coeficientes de las ecuaciones
+names(VAR_BP_EQ1$coefficients) <- c("Intercepto","dY_t-1","dG_t-1","dT_t-1")
+names(VAR_BP_EQ2$coefficients) <- c("Intercepto","dY_t-1","dG_t-1","dT_t-1")
+names(VAR_BP_EQ3$coefficients) <- c("Intercepto","dY_t-1","dG_t-1","dT_t-1")
+
+coeftest(VAR_BP_EQ1, vcov. = sandwich)
+coeftest(VAR_BP_EQ2, vcov. = sandwich)
+coeftest(VAR_BP_EQ3, vcov. = sandwich)
+#En un principio solo Y estar?a afectado a un 95% de significancia por su propio rezago
+#y por el rezago de G. No obstante nos tomamos con calma estos datos puesto que estimaci?n
+#se da sobre par?metros reducidos y no estructurales
+
+#Comprobar ra?ces unitarias o no dentro de las ecuaciones
+VAR_est <- VAR(y = VAR_BP, p = 1)
+roots(VAR_est) #No hay ra?z unitaria, pues ra?ces inversas son menores que 1
+
+#Ver autocorrelaci?n serial entre los errores
+par(mfrow=c(1,2))
+ACF1=acf(VAR_BP_EQ1$residuals,las=1,lag.max=20,tck=.02,xlab="lags",
+         ylab="FAS",main="FAS primera ecuaci?n")
+PAC1=pacf(VAR_BP_EQ1$residuals,las=1,lag.max=20,tck=.02,xlab="lags",
+          ylab="FAP",main="FAP primera ecuaci?n")
+Box.test(VAR_BP_EQ1$residuals,lag=8,type="Ljung-Box")
+Box.test(VAR_BP_EQ1$residuals,lag=8,type="Box-Pierce")
+
+par(mfrow=c(1,2))
+ACF2=acf(VAR_BP_EQ2$residuals,las=1,lag.max=20,tck=.02,xlab="lags",
+         ylab="FAS",main="FAS segunda ecuaci?n")
+PAC2=pacf(VAR_BP_EQ2$residuals,las=1,lag.max=20,tck=.02,xlab="lags",
+          ylab="FAP",main="FAP segunda ecuaci?n")
+Box.test(VAR_BP_EQ2$residuals,lag=8,type="Ljung-Box")
+Box.test(VAR_BP_EQ2$residuals,lag=8,type="Box-Pierce")
+
+par(mfrow=c(1,2))
+ACF3=acf(VAR_BP_EQ3$residuals,las=1,lag.max=20,tck=.02,xlab="lags",
+         ylab="FAS",main="FAs tercera ecuaci?n")
+PAC3=pacf(VAR_BP_EQ3$residuals,las=1,lag.max=20,tck=.02,xlab="lags",
+          ylab="FAP",main="FAP tercera ecuaci?n")
+Box.test(VAR_BP_EQ3$residuals,lag=8,type="Ljung-Box")
+Box.test(VAR_BP_EQ3$residuals,lag=8,type="Box-Pierce")
+#Para las tres ecuaciones errores incorrelacionados, lo que es una buena se?al que estos
+#son ruidos blancos y, por ende, modelo bien especificado
+
+#Confirmamos mediante un test serial
+serial.test(VAR_est,lags.pt=10) #Pvalue no rechaza  la H0, por consiguiente, los rezagos de los errores no est?n correlacionados, modelo parece estar correctamente especificado
+
+
+# --------- 3. VAR estructual con restricciones a la Sims ----------------------
+
+#En base a las restricciones a la Sims formamos nuestra matriz B0^-1
+amat <- diag(3)
+amat[2, 1] <- NA
+amat[3, 1] <- NA
+amat[3, 2] <- NA
+amat
+#Sabemos que, por Cholesky, covar_reducida = B0^-1*(covar_estructural)*(B0^-1)^T
+#Estimamos el var_estructural usando metodo direct, donde la covar_estructural de
+#Cholesky es una diagonal (aunque no necesariamente es una matriz Identidad)
+SVAR_sims <- SVAR(x = VAR_est, estmethod = "direct", Amat = amat, Bmat = NULL, 
+                  hessian = TRUE, method="BFGS")  
+
+#Calculamos IR
+SVAR_sims1<-irf(SVAR_sims,impulse="dY", response="dY")
+SVAR_sims2<-irf(SVAR_sims,impulse="dG", response="dY")
+SVAR_sims3<-irf(SVAR_sims,impulse="dT", response="dY")
+SVAR_sims4<-irf(SVAR_sims,impulse="dY", response="dG")
+SVAR_sims5<-irf(SVAR_sims,impulse="dG", response="dG")
+SVAR_sims6<-irf(SVAR_sims,impulse="dT", response="dG")
+SVAR_sims7<-irf(SVAR_sims,impulse="dY", response="dT")
+SVAR_sims8<-irf(SVAR_sims,impulse="dG", response="dT")
+SVAR_sims9<-irf(SVAR_sims,impulse="dT", response="dT")
+
+#Graficamos IR
+plot(SVAR_sims1)
+plot(SVAR_sims2)
+plot(SVAR_sims3)
+plot(SVAR_sims4)
+plot(SVAR_sims5)
+plot(SVAR_sims6)
+plot(SVAR_sims7)
+plot(SVAR_sims8)
+plot(SVAR_sims9)
+
+#Descomposici?n de las varianzas
+fevd(SVAR_sims, n.ahead = 5)
+
+# --------- 4. VAR estructual con restricciones de BP ----------------------
+
+#Sabemos que para BP, la B0 de Y = [G T Y] tiene a12=0 (en la otra hip?tesis a21=0),
+#a13=0, a21!=0 (en la otra hip?tesis a12!=0) ,a23=elasticidad impuestos-producto 
+
+#sabemos que la elasticidad es una divisi?n de variaciones de logaritmos, entonces la elasticidad
+#de taxes netos respecto a producto puede verse como el coeficiente de la regresi?n lineal
+#del logaritmo de T respecto al logaritmo de Y
+reg<-lm(T~Y)
+a23<-reg$coefficients[2]
+
+#Hip?tesis 1: Asumiendo a12=0
+amat_BP_1 <- diag(3)
+amat_BP_1[2,3]<-a23
+amat_BP_1[2,1]<-NA
+amat_BP_1[3,1]<-NA
+amat_BP_1[3,2]<-NA
+#Hip?tesis 2: Asumiendo a12=0
+amat_BP_2 <- diag(3)
+amat_BP_2[2,3]<-a23
+amat_BP_2[1,2]<-NA
+amat_BP_2[3,1]<-NA
+amat_BP_2[3,2]<-NA
+
+#Estimamos el VAR estructural:
+SVAR_BP_1 <- SVAR(x = VAR_est, estmethod = "direct", Amat = amat_BP_1, Bmat = NULL, 
+                  hessian = TRUE, method="BFGS")  
+SVAR_BP_2 <- SVAR(x = VAR_est, estmethod = "direct", Amat = amat_BP_2, Bmat = NULL, 
+          hessian = TRUE, method="BFGS")
+
+########TABLA 1########
+
+sd_dG <- sd(dG)
+sd_dT <- sd(dT)
+G_3sd = c()
+T_3sd = c()
+G_23sd = c()
+T_23sd = c()
+for(i in 1:91){
+  if(DG[i] > 3*sd_DG){
+    G_3sd <- format(c(G_3sd,time(DG)[i],DG[i]), scientific = FALSE)
+  } else if(2*sd_DG < DG[i]){
+    G_23sd <- format(c(G_23sd,time(DG)[i],DG[i]), scientific = FALSE)
+  }
+  if(DT[i] > 3*sd_DT){
+    T_3sd <- format(c(T_3sd,time(DT)[i],DT[i]), scientific = FALSE)
+  } else if(2*sd_DT < DT[i]){
+    T_23sd <- format(c(T_23sd,time(DT)[i],DT[i]), scientific = FALSE)
+  }
+}
+G_3sd = matrix(G_3sd,nrow = 2,ncol = 2)
+T_3sd = matrix(T_3sd,nrow = 2,ncol = 2)
+G_23sd = matrix(G_23sd,nrow = 2,ncol = 1)
+
+
+##TABLE II##########
+results = c('efecto choque G en Y','efecto choque T en Y','efecto choque G en T','efecto choque T en G')
+
+SVAR_BP_results = c(SVAR_BP_1$A[3,1],SVAR_BP_1$A[3,2],SVAR_BP_1$A[2,1],SVAR_BP_2$A[1,2])
+SVAR_BP_sd = c(SVAR_BP_1$Ase[3,1],SVAR_BP_1$Ase[3,2],SVAR_BP_1$Ase[2,1],SVAR_BP_2$Ase[1,2])
+SVAR_BP_p = as.numeric(SVAR_BP_results)/as.numeric(SVAR_BP_sd)
+SVAR_BP_p 
+SVAR_BP_results = rbind(SVAR_BP_results,SVAR_BP_sd,SVAR_BP_p[1:4])
+SVAR_BP_results
+
+##TABLE III##########
+
+#TABLE 3
+trim = c(1,2,4,8,10,11)
+irf1 = c()
+irf2 = c()
+irf3 = c()
+
+SVAR_BP_2.irf1<-irf(SVAR_BP_2,impulse="dY", response="dY")
+SVAR_BP_2.irf2<-irf(SVAR_BP_2,impulse="dY", response="dG")
+SVAR_BP_2.irf3<-irf(SVAR_BP_2,impulse="dY", response="dT")
+SVAR_BP_2.irf4<-irf(SVAR_BP_2,impulse="dG", response="dY")
+SVAR_BP_2.irf5<-irf(SVAR_BP_2,impulse="dG", response="dG")
+SVAR_BP_2.irf6<-irf(SVAR_BP_2,impulse="dG", response="dT")
+SVAR_BP_2.irf7<-irf(SVAR_BP_2,impulse="dT", response="dY") #Rpta a shocks en taxes en el PIB
+SVAR_BP_2.irf8<-irf(SVAR_BP_2,impulse="dT", response="dG") #Rpta a shocks en taxes en el Gasto
+SVAR_BP_2.irf9<-irf(SVAR_BP_2,impulse="dT", response="dT") #Rpta a shocks en taxes en los Impuestos
+
+for(j in trim){
+  irf1 = c(irf1,SVAR_BP_2.irf7$irf$dT[j])
+  irf2 = c(irf2,SVAR_BP_2.irf8$irf$dT[j])
+  irf3 = c(irf3,SVAR_BP_2.irf9$irf$dT[j])
+}
+BP_2_irf = rbind(irf1,irf2,irf3)
+
+table3_BP2 = data.frame(BP_2_irf)
+names(table3_BP2) <- trim
+
+#TABLE 4
+
+SVAR_BP_1.irf1<-irf(SVAR_BP_1,impulse="dY", response="dY")
+SVAR_BP_1.irf2<-irf(SVAR_BP_1,impulse="dY", response="dG")
+SVAR_BP_1.irf3<-irf(SVAR_BP_1,impulse="dY", response="dT")
+SVAR_BP_1.irf4<-irf(SVAR_BP_1,impulse="dG", response="dY")
+SVAR_BP_1.irf5<-irf(SVAR_BP_1,impulse="dG", response="dG")
+SVAR_BP_1.irf6<-irf(SVAR_BP_1,impulse="dG", response="dT")
+SVAR_BP_1.irf7<-irf(SVAR_BP_1,impulse="dT", response="dY") #Rpta a shocks en taxes en el PIB
+SVAR_BP_1.irf8<-irf(SVAR_BP_1,impulse="dT", response="dG") #Rpta a shocks en taxes en el Gasto
+SVAR_BP_1.irf9<-irf(SVAR_BP_1,impulse="dT", response="dT") #Rpta a shocks en taxes en los Impuestos
+
+
+
+irf4 = c()
+irf5 = c()
+irf6 = c()
+for(i in trim){
+  irf4 = c(irf4,SVAR_BP_1.irf4$irf$dG[i])
+  irf5 = c(irf5,SVAR_BP_1.irf5$irf$dG[i])
+  irf6 = c(irf6,SVAR_BP_1.irf6$irf$dG[i])
+}
+BP_1_irf1 = rbind(irf4,irf5,irf6)
+table3_BP1_1 = data.frame(BP_1_irf1)
+names(table3_BP1_1) <- trim
+table3_BP2_1
